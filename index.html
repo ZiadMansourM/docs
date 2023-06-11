@@ -101,17 +101,20 @@
     </div>
 
     <div style="margin: 2em auto; max-width: 900px">
-      <pre><code class="language-javascript">
-var modelPlayer = this.Js3dModelViewer
-var viewerElement = document.getElementById('viewer')
-var scene = modelPlayer.prepareScene(viewerElement)
-modelPlayer.loadObject(scene, './assets/sample.obj')
-// or modelPlayer.loadGlb(scene, './assets/avocado.glb')
+      <pre>
+        <code class="language-javascript">
+          var modelPlayer = this.Js3dModelViewer
+          var viewerElement = document.getElementById('viewer')
+          var scene = modelPlayer.prepareScene(viewerElement)
+          modelPlayer.loadObject(scene, './assets/sample.obj')
+          // or modelPlayer.loadGlb(scene, './assets/avocado.glb')
 
-var fullScreenButton = document.getElementById('fullscreen-button')
-fullScreenButton.addEventListener('click', function () {
-  modelPlayer.goFullScreen(viewerElement)
-})</code></pre>
+          var fullScreenButton = document.getElementById('fullscreen-button')
+          fullScreenButton.addEventListener('click', function () {
+            modelPlayer.goFullScreen(viewerElement)
+          })
+        </code>
+      </pre>
     </div>
 
     <footer class="center footer">
@@ -199,7 +202,7 @@ fullScreenButton.addEventListener('click', function () {
     nameElement.innerHTML = 'Sample 04'
     modelPlayer.loadGlb(
       scene, 
-      './assets/mesh/mesh.stl',
+      './assets/mesh/core_points.ply',
       function () {
         nameElement.innerHTML = 'Sample 04'
         loadingElement.innerHTML = ''
