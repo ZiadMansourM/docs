@@ -4,190 +4,96 @@
     <meta charset="utf-8">
     <title>Javascript 3D Model Viewer</title>
     <style>
-      body {
-        margin: 0;
-        padding: 0;
-        background: white;
-        font-family: Geneva, sans-serif;
+      body { margin: 0; }
+      canvas { display: block; }
+      button {
+        position: fixed;
+        top: 10px;
+        left: 10px;
+        z-index: 1;
       }
-      p {
-        margin: 0;
-        padding: 0;
-      }
-      a {
-        color: #3CB371;
-      }
-      #viewer {
-        width: 100%; 
-        height: 400px; 
-        margin: auto; 
-        background: #000000;
-        margin-top: 2em;
-      }
-      .button {
-        border-radius: 0.2em;
-        background-color: white;
-        color: #3CB371;
-        border: 3px solid #3CB371;
-        font-weight: bold;
-        padding: 1em;
-        cursor: pointer;
-      }
-      .center {
-        text-align: center;
-        margin-top: 2em;
-      }
-      canvas {
-        display: block;
-      }
-      pre {
-        padding: 1em;
-        max-width: 900px;
-        margin: auto;
-        margin-top: 4em;
-        font-size: 1.2em;
-      }
-      .footer {
-        padding-bottom: 2em;
-      }
-      .mr2 {
-        margin-right: 2em;
-      }
-	</style>
-    <link 
-      rel="stylesheet"
-      href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.15.0/themes/prism.min.css"
-    />
+    </style>
   </head>
 
   <body>
-  <div class="content">
+    <button id="sample-3-button">Load Sample 3 (PLY)</button>
+    <button id="sample-4-button" style="top: 50px;">Load Sample 4 (STL)</button>
 
-    <header class="center"><h1>Javascript 3D Model Viewer</h1></header>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/jsm/loaders/STLLoader.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/jsm/loaders/PLYLoader.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/jsm/controls/OrbitControls.js"></script>
+    <script>
+      let scene, camera, renderer, controls, object;
 
-    <div id="viewer" style="">
-    </div>
+      function init() {
+        scene = new THREE.Scene();
+        camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        renderer = new THREE.WebGLRenderer();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        document.body.appendChild(renderer.domElement);
 
-    <div class="center">
-      <span id="name">Sample 01</span>
-      <span id="loading"></span>
-    </div>
+        const gridHelper = new THREE.GridHelper(10, 10);
+        scene.add(gridHelper);
 
-    <div class="center">
-      <button class="button" id="sample-1-button">
-        Sample 1
-      </button>
-      <button class="button" id="sample-2-button">
-        Sample 2
-      </button>
-      <button class="button" id="sample-3-button">
-        Sample 3
-      </button>
-      <button class="button" id="sample-4-button">
-        Sample 4 (.glb)
-      </button>
-      <!--button class="button" id="sample-5-button">
-        Sample 5 (.usdz)
-      </button-->
-    </div>
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
+        scene.add(ambientLight);
 
-    <div class="center">
-      <input class="mr2" id="grid-button" type="checkbox" checked>
-        Grid
-      </input>
-      <button class="button" id="fullscreen-button">
-        Go Full Screen
-      </button>
-    </div>
+        const directionalLight = new THREE.DirectionalLight(0xffffff, 0.5);
+        directionalLight.position.set(1, 1, 1);
+        scene.add(directionalLight);
 
-    <div style="margin: 2em auto; max-width: 900px">
-      <pre>
-        <code class="language-javascript">
-          var modelPlayer = this.Js3dModelViewer
-          var viewerElement = document.getElementById('viewer')
-          var scene = modelPlayer.prepareScene(viewerElement)
-          modelPlayer.loadObject(scene, './assets/sample.obj')
-          // or modelPlayer.loadGlb(scene, './assets/avocado.glb')
+        controls = new THREE.OrbitControls(camera, renderer.domElement);
+        camera.position.set(0, 0, 5);
+        controls.update();
 
-          var fullScreenButton = document.getElementById('fullscreen-button')
-          fullScreenButton.addEventListener('click', function () {
-            modelPlayer.goFullScreen(viewerElement)
-          })
-        </code>
-      </pre>
-    </div>
+        window.addEventListener('resize', onWindowResize, false);
+      }
 
-    <footer class="center footer">
-      <a href="https://github.com/cgwire/js-3d-model-viewer">
-        See sources on Github
-      </a>
-    </footer>
-  </div>
+      function loadModel(url, format) {
+        if (object) {
+          scene.remove(object);
+        }
 
-  <script src="./dist/js-3d-model-viewer.js"></script>
-  <script>
-  var modelPlayer = this.Js3dModelViewer
-  var nameElement = document.getElementById('name')
-  var loadingElement = document.getElementById('loading')
-  var viewerElement = document.getElementById('viewer')
-  var scene = modelPlayer.prepareScene(viewerElement, {
-    grid: true
-  })
+        let loader;
+        if (format === 'stl') {
+          loader = new THREE.STLLoader();
+        } else if (format === 'ply') {
+          loader = new THREE.PLYLoader();
+        } else {
+          throw new Error('Invalid format');
+        }
 
-  viewerElement.addEventListener('loading', function (event) {
-    if (event.detail.loaded === 0) {
-      nameElement.innerHTML = 'Loading...'
-    } 
-    var progress = Math.floor(100 * event.detail.loaded / event.detail.total)
-    loadingElement.innerHTML = progress + '%'
-  })
+        loader.load(url, function (geometry) {
+          const material = new THREE.MeshPhongMaterial({ color: 0xff5533, specular: 0x111111 });
+          object = new THREE.Mesh(geometry, material);
+          scene.add(object);
+        });
+      }
 
-  modelPlayer.loadObject(scene, './assets/sample.obj', null, function () {
-    nameElement.innerHTML = 'Sample 01'
-    loadingElement.innerHTML = ''
-  })
+      function onWindowResize() {
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+      }
 
-  var fullScreenButton = document.getElementById('fullscreen-button')
-  fullScreenButton.addEventListener('click', function () {
-    modelPlayer.goFullScreen(viewerElement)
-  })
+      function animate() {
+        requestAnimationFrame(animate);
+        controls.update();
+        renderer.render(scene, camera);
+      }
 
-  var sample1Button = document.getElementById('sample-1-button')
-  sample1Button.addEventListener('click', function () {
-    modelPlayer.loadObject(scene, './assets/sample.obj', null, function () {
-      nameElement.innerHTML = 'Sample 01'
-      loadingElement.innerHTML = ''
-    })
-  })
+      init();
+      animate();
+      loadModel('./assets/mesh/mesh.stl', 'stl');
 
-  var sample2Button = document.getElementById('sample-2-button')
-  sample2Button.addEventListener('click', function () {
-    modelPlayer.loadObject(scene, './assets/sample02.obj', null, function () {
-      nameElement.innerHTML = 'Sample 02'
-      loadingElement.innerHTML = ''
-    })
-  })
+      document.getElementById('sample-3-button').addEventListener('click', function () {
+        loadModel('./assets/mesh/core_points.ply', 'ply');
+      });
 
-  var sample3Button = document.getElementById('sample-3-button')
-  sample3Button.addEventListener('click', function () {
-    modelPlayer.loadObject(scene, './assets/sample03.obj', null, function () {
-      nameElement.innerHTML = 'Sample 03'
-      loadingElement.innerHTML = ''
-    })
-  })
-
-  var sample4Button = document.getElementById('sample-4-button')
-  sample4Button.addEventListener('click', function () {
-    modelPlayer.loadGlb(scene, './assets/avocado.glb', function () {
-      nameElement.innerHTML = 'Sample 04'
-      loadingElement.innerHTML = ''
-    })
-  })
-
-  var gridButton = document.getElementById('grid-button')
-  gridButton.addEventListener('click', function () {
-    modelPlayer.toggleGrid(scene)
-  })
-  </script>
+      document.getElementById('sample-4-button').addEventListener('click', function () {
+        loadModel('./assets/mesh/mesh.stl', 'stl');
+      });
+    </script>
   </body>
 </html>
