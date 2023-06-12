@@ -147,14 +147,18 @@ const loadObject = (scene, url, materialUrl, callback) => {
 
 const loadGlb = (scene, url, callback) => {
   const loader = new GLTFLoader()
-  if (scene.locked) return false
+  if (scene.locked) {
+    return false
+  }
   scene.locked = true
 
   loader.load(url, (gltf) => {
     scene.add(gltf.scene)
     fitCameraToObject(scene.camera, gltf.scene, scene.lights)
     scene.locked = false
-    if (callback) callback(gltf)
+    if (callback) {
+      callback(gltf)
+    }
     emitEvent(scene.element, 'loaded', {gltf})
   },
   (xhr) => {
@@ -172,7 +176,9 @@ const loadGlb = (scene, url, callback) => {
   },
   (err) => {
     emitEvent(scene.element, 'error', {err})
-    if (callback) callback(err)
+    if (callback) {
+      callback(err)
+    }
   })
 
   return loader
@@ -216,36 +222,52 @@ const loadObj = (objLoader, scene, url, callback) => {
 
 const loadPly = (scene, url, callback) => {
   const plyLoader = new PLYLoader();
-  if (scene.locked) return false;
+  if (scene.locked) {
+    return false;
+  }
   scene.locked = true;
 
+  scene.children.forEach((obj) => {
+    scene.remove(obj)
+  })
+
   plyLoader.load(url, (geometry) => {
-    const material = new THREE.MeshPhongMaterial({ color: 0xbbbbcc });
-    const mesh = new THREE.Mesh(geometry, material);
-    scene.add(mesh);
-    fitCameraToObject(scene.camera, mesh, scene.lights);
-    scene.locked = false;
-    if (callback) callback(mesh);
-    emitEvent(scene.element, 'loaded', { mesh });
+    const material = new THREE.MeshPhongMaterial({ color: 0xbbbbcc })
+    const mesh = new THREE.Mesh(geometry, material)
+    scene.add(mesh)
+    fitCameraToObject(scene.camera, mesh, scene.lights)
+    scene.locked = false
+    if (callback) {
+      callback(mesh)
+    }
+    emitEvent(scene.element, 'loaded', { mesh })
   });
 
   return plyLoader;
 }
 
 const loadStl = (scene, url, callback) => {
-  const stlLoader = new STLLoader();
-  if (scene.locked) return false;
-  scene.locked = true;
+  const stlLoader = new STLLoader()
+  if (scene.locked) {
+    return false
+  }
+  scene.locked = true
+
+  scene.children.forEach((obj) => {
+    scene.remove(obj)
+  })
 
   stlLoader.load(url, (geometry) => {
-    const material = new THREE.MeshPhongMaterial({ color: 0xbbbbcc });
-    const mesh = new THREE.Mesh(geometry, material);
-    scene.add(mesh);
-    fitCameraToObject(scene.camera, mesh, scene.lights);
-    scene.locked = false;
-    if (callback) callback(mesh);
-    emitEvent(scene.element, 'loaded', { mesh });
-  });
+    const material = new THREE.MeshPhongMaterial({ color: 0xbbbbcc })
+    const mesh = new THREE.Mesh(geometry, material)
+    scene.add(mesh)
+    fitCameraToObject(scene.camera, mesh, scene.lights)
+    scene.locked = false
+    if (callback) {
+      callback(mesh)
+    }
+    emitEvent(scene.element, 'loaded', { mesh })
+  })
 
   return stlLoader;
 }

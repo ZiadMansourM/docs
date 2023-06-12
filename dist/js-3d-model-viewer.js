@@ -43800,13 +43800,17 @@
 	};
 	const loadGlb = (scene, url, callback) => {
 	  const loader = new GLTFLoader();
-	  if (scene.locked) return false;
+	  if (scene.locked) {
+	    return false;
+	  }
 	  scene.locked = true;
 	  loader.load(url, gltf => {
 	    scene.add(gltf.scene);
 	    fitCameraToObject(scene.camera, gltf.scene, scene.lights);
 	    scene.locked = false;
-	    if (callback) callback(gltf);
+	    if (callback) {
+	      callback(gltf);
+	    }
 	    emitEvent(scene.element, 'loaded', {
 	      gltf
 	    });
@@ -43826,7 +43830,9 @@
 	    emitEvent(scene.element, 'error', {
 	      err
 	    });
-	    if (callback) callback(err);
+	    if (callback) {
+	      callback(err);
+	    }
 	  });
 	  return loader;
 	};
@@ -43870,8 +43876,13 @@
 	};
 	const loadPly = (scene, url, callback) => {
 	  const plyLoader = new PLYLoader();
-	  if (scene.locked) return false;
+	  if (scene.locked) {
+	    return false;
+	  }
 	  scene.locked = true;
+	  scene.children.forEach(obj => {
+	    scene.remove(obj);
+	  });
 	  plyLoader.load(url, geometry => {
 	    const material = new MeshPhongMaterial({
 	      color: 0xbbbbcc
@@ -43880,7 +43891,9 @@
 	    scene.add(mesh);
 	    fitCameraToObject(scene.camera, mesh, scene.lights);
 	    scene.locked = false;
-	    if (callback) callback(mesh);
+	    if (callback) {
+	      callback(mesh);
+	    }
 	    emitEvent(scene.element, 'loaded', {
 	      mesh
 	    });
@@ -43889,8 +43902,13 @@
 	};
 	const loadStl = (scene, url, callback) => {
 	  const stlLoader = new STLLoader();
-	  if (scene.locked) return false;
+	  if (scene.locked) {
+	    return false;
+	  }
 	  scene.locked = true;
+	  scene.children.forEach(obj => {
+	    scene.remove(obj);
+	  });
 	  stlLoader.load(url, geometry => {
 	    const material = new MeshPhongMaterial({
 	      color: 0xbbbbcc
@@ -43899,7 +43917,9 @@
 	    scene.add(mesh);
 	    fitCameraToObject(scene.camera, mesh, scene.lights);
 	    scene.locked = false;
-	    if (callback) callback(mesh);
+	    if (callback) {
+	      callback(mesh);
+	    }
 	    emitEvent(scene.element, 'loaded', {
 	      mesh
 	    });
