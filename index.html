@@ -69,7 +69,7 @@
     </div>
 
     <div class="center">
-      <span id="name">Points Cloud</span>
+      <span id="name">Mesh</span>
       <span id="loading"></span>
     </div>
 
@@ -113,10 +113,13 @@
     loadingElement.innerHTML = progress + '%'
   })
 
-  modelPlayer.loadPly(scene, './assets/cottage/points_cloud.ply', null, function () {
-    nameElement.innerHTML = 'Points Cloud'
-    loadingElement.innerHTML = ''
-  })
+  modelPlayer.loadStl(
+      scene, 
+      './assets/mesh/mesh.stl',
+      function () {
+        nameElement.innerHTML = 'Mesh'
+        loadingElement.innerHTML = ''
+    })
 
   var fullScreenButton = document.getElementById('fullscreen-button')
   fullScreenButton.addEventListener('click', function () {
