@@ -74,10 +74,11 @@
     </div>
 
     <div class="center">
-      <button class="button" id="sample-1-button">
+      <button class="button" id="sample-1-button" disabled>
         Points Cloud
       </button>
-      <button class="button" id="sample-2-button">
+      <!-- disable sample-2-button -->
+      <button class="button" id="sample-2-button" disabled>
         Core Points
       </button>
       <button class="button" id="sample-3-button">
@@ -114,7 +115,7 @@
   })
 
   modelPlayer.loadStl(
-      scene,
+      scene, 
       './assets/cottage/mesh.stl',
       function () {
         nameElement.innerHTML = 'Mesh'
@@ -128,9 +129,6 @@
 
   var sample1Button = document.getElementById('sample-1-button')
   sample1Button.addEventListener('click', function () {
-    scene = modelPlayer.prepareScene(viewerElement, {
-      grid: true
-    })
     modelPlayer.clearScene(scene)
     modelPlayer.resetCamera(scene)
     modelPlayer.showGrid(scene)
@@ -142,9 +140,6 @@
 
   var sample2Button = document.getElementById('sample-2-button')
   sample2Button.addEventListener('click', function () {
-    scene = modelPlayer.prepareScene(viewerElement, {
-      grid: true
-    })
     modelPlayer.clearScene(scene)
     modelPlayer.resetCamera(scene)
     modelPlayer.showGrid(scene)
@@ -156,15 +151,12 @@
 
   var sample3Button = document.getElementById('sample-3-button')
   sample3Button.addEventListener('click', function () {
-    scene = modelPlayer.prepareScene(viewerElement, {
-      grid: true
-    })
     modelPlayer.clearScene(scene)
     modelPlayer.resetCamera(scene)
     modelPlayer.showGrid(scene)
     nameElement.innerHTML = 'Mesh'
     modelPlayer.loadStl(
-      scene, 
+      scene,
       './assets/cottage/mesh.stl',
       function () {
         nameElement.innerHTML = 'Mesh'
