@@ -4,7 +4,8 @@ import { OBJLoader } from 'three/examples/jsm/loaders/OBJLoader.js'
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
 import { TrackballControls } from 'three/examples/jsm/controls/TrackballControls.js'
-// const USDZLoader = require('three-usdz-loader')
+import { PLYLoader } from 'three/examples/jsm/loaders/PLYLoader.js';
+import { STLLoader } from 'three/examples/jsm/loaders/STLLoader.js';
 
 const emitEvent = (element, eventName, data) => {
   element.dispatchEvent(new window.CustomEvent(eventName, {
@@ -12,23 +13,14 @@ const emitEvent = (element, eventName, data) => {
   }))
 }
 
-/*
- * Enable three.js cache.
- */
 const enableCache = () => {
   THREE.Cache.enable = true
 }
 
-/*
- * Disable three.js cache.
- */
 const disableCache = () => {
   THREE.Cache.enable = false
 }
 
-/*
- * Default configuration for camera.
- */
 const setCamera = (aspect) => {
   const camera = new THREE.PerspectiveCamera(
     45,
@@ -41,9 +33,6 @@ const setCamera = (aspect) => {
   return camera
 }
 
-/*
- * Add lights to given scene (ambient and spots).
- */
 const setLights = (scene) => {
   const ambient = new THREE.AmbientLight(0xffffff, 0.15)
   const backLight = new THREE.DirectionalLight(0xffffff, 0.3)
@@ -74,9 +63,6 @@ const setLights = (scene) => {
   return scene
 }
 
-/*
- * Link an orbit control to given camera and renderer.
- */
 const setControls = (camera, renderer, isTrackball) => {
   let controls
 
@@ -96,9 +82,6 @@ const setControls = (camera, renderer, isTrackball) => {
   return controls
 }
 
-/*
- * Configure Three renderer.
- */
 const setRenderer = (width, height) => {
   const renderer = new THREE.WebGLRenderer({ antialias: true })
   renderer.setSize(width, height)
@@ -107,9 +90,6 @@ const setRenderer = (width, height) => {
   return renderer
 }
 
-/*
- * Render function required by Three.js to display things.
- */
 const render = (element, renderer, scene, camera, isTrackball) => {
   element.appendChild(renderer.domElement)
   const animate = () => {
@@ -122,10 +102,6 @@ const render = (element, renderer, scene, camera, isTrackball) => {
   return scene
 }
 
-/*
- * Build the scene in which the object will be displayed. It configures Three
- * properly and adds camera, lights and controls.
- */
 const prepareScene = (domElement, opts) => {
   const scene = new THREE.Scene()
   const element = domElement
@@ -150,10 +126,6 @@ const prepareScene = (domElement, opts) => {
   return scene
 }
 
-/*
- * Load a mesh (.obj) into the given scene. Materials can be specified too
- * (.mtl).
- */
 const loadObject = (scene, url, materialUrl, callback) => {
   const objLoader = new OBJLoader()
   if (scene.locked) return false
@@ -173,9 +145,6 @@ const loadObject = (scene, url, materialUrl, callback) => {
   return objLoader
 }
 
-/*
- * Load mesh and materials (.glb) into the given scene.
- */
 const loadGlb = (scene, url, callback) => {
   const loader = new GLTFLoader()
   if (scene.locked) return false
@@ -209,31 +178,6 @@ const loadGlb = (scene, url, callback) => {
   return loader
 }
 
-
-/*
-const loadUsdz = (scene, url, callback) => {
-  const loader = new USDZLoader()
-  if (scene.locked) return false
-  scene.locked = true
-
-  const group = new THREE.Group()
-  scene.add(group)
-  loader.loadFile(file, group)
-    .then(model => {
-      fitCameraToObject(scene.camera, model, scene.lights)
-      scene.locked = false
-      if (callback) callback(model)
-      emitEvent(scene.element, 'loaded', {model})
-      return Promise.resolve(model)
-    })
-}
-*/
-
-
-/*
- * Load an .obj file. If no materials is configured on the loader, it sets
- * a phong grey material by default.
- */
 const loadObj = (objLoader, scene, url, callback) => {
   const material = new THREE.MeshPhongMaterial({ color: 0xbbbbcc })
 
@@ -270,9 +214,42 @@ const loadObj = (objLoader, scene, url, callback) => {
   })
 }
 
-/*
- * Remove all meshes from the scene.
- */
+const loadPly = (scene, url, callback) => {
+  const plyLoader = new PLYLoader();
+  if (scene.locked) return false;
+  scene.locked = true;
+
+  plyLoader.load(url, (geometry) => {
+    const material = new THREE.MeshPhongMaterial({ color: 0xbbbbcc });
+    const mesh = new THREE.Mesh(geometry, material);
+    scene.add(mesh);
+    fitCameraToObject(scene.camera, mesh, scene.lights);
+    scene.locked = false;
+    if (callback) callback(mesh);
+    emitEvent(scene.element, 'loaded', { mesh });
+  });
+
+  return plyLoader;
+}
+
+const loadStl = (scene, url, callback) => {
+  const stlLoader = new STLLoader();
+  if (scene.locked) return false;
+  scene.locked = true;
+
+  stlLoader.load(url, (geometry) => {
+    const material = new THREE.MeshPhongMaterial({ color: 0xbbbbcc });
+    const mesh = new THREE.Mesh(geometry, material);
+    scene.add(mesh);
+    fitCameraToObject(scene.camera, mesh, scene.lights);
+    scene.locked = false;
+    if (callback) callback(mesh);
+    emitEvent(scene.element, 'loaded', { mesh });
+  });
+
+  return stlLoader;
+}
+
 const clearScene = (scene) => {
   scene.children.forEach((obj) => {
     if (obj.type === 'Group') {
@@ -281,16 +258,10 @@ const clearScene = (scene) => {
   })
 }
 
-/*
- * Put back camera in its original position.
- */
 const resetCamera = (scene) => {
   scene.camera.controls.reset()
 }
 
-/*
- * Put back camera in its original position.
- */
 const showGrid = (scene) => {
   if (!scene.grid) {
     const size = 10
@@ -307,9 +278,6 @@ const hideGrid = (scene) => {
   scene.grid.visible = false
 }
 
-/*
- * Display the viewer through the fullscreen feature of the browser.
- */
 const goFullScreen = (element) => {
   const hasWebkitFullScreen = 'webkitCancelFullScreen' in document
   const hasMozFullScreen = 'mozCancelFullScreen' in document
@@ -327,10 +295,6 @@ const goFullScreen = (element) => {
   }
 }
 
-/*
- * When the window is resized, the camera aspect ratio needs to be updated to
- * avoid distortions.
- */
 const onWindowResize = (element, camera, renderer) => () => {
   const resize = () => {
     const isFullscreen = !window.screenTop && !window.screenY
@@ -345,11 +309,6 @@ const onWindowResize = (element, camera, renderer) => () => {
   setTimeout(resize, 100)
 }
 
-/*
- * Depending on the object size, the camera Z position must be bigger or
- * smaller to make sure the object fill all the space without getting outside
- * camera point of view.
- */
 const fitCameraToObject = (camera, object, lights) => {
   const fov = camera.fov
   const boundingBox = new THREE.Box3()
@@ -368,9 +327,6 @@ const fitCameraToObject = (camera, object, lights) => {
   lights.backLight.position.set(z, 0, -z)
 }
 
-/*
- * Move object to the center.
- */
 const resetObjectPosition = (boundingBox, object) => {
   const size = new THREE.Vector3()
   boundingBox.setFromObject(object)
@@ -385,7 +341,8 @@ export {
   prepareScene,
   loadObject,
   loadGlb,
-  // loadUsdz,
+  loadPly,
+  loadStl,
   clearScene,
   resetCamera,
   goFullScreen,

@@ -35438,7 +35438,7 @@
 	const _ab = new Vector3();
 	const _cb = new Vector3();
 
-	const _color = new Color();
+	const _color$1 = new Color();
 
 	function ParserState() {
 
@@ -35937,13 +35937,13 @@
 							);
 							if ( data.length >= 7 ) {
 
-								_color.setRGB(
+								_color$1.setRGB(
 									parseFloat( data[ 4 ] ),
 									parseFloat( data[ 5 ] ),
 									parseFloat( data[ 6 ] )
 								).convertSRGBToLinear();
 
-								state.colors.push( _color.r, _color.g, _color.b );
+								state.colors.push( _color$1.r, _color$1.g, _color$1.b );
 
 							} else {
 
@@ -42698,41 +42698,1017 @@
 
 	}
 
-	// const USDZLoader = require('three-usdz-loader')
+	/**
+	 * Description: A THREE loader for PLY ASCII files (known as the Polygon
+	 * File Format or the Stanford Triangle Format).
+	 *
+	 * Limitations: ASCII decoding assumes file is UTF-8.
+	 *
+	 * Usage:
+	 *	const loader = new PLYLoader();
+	 *	loader.load('./models/ply/ascii/dolphins.ply', function (geometry) {
+	 *
+	 *		scene.add( new THREE.Mesh( geometry ) );
+	 *
+	 *	} );
+	 *
+	 * If the PLY file uses non standard property names, they can be mapped while
+	 * loading. For example, the following maps the properties
+	 * “diffuse_(red|green|blue)” in the file to standard color names.
+	 *
+	 * loader.setPropertyNameMapping( {
+	 *	diffuse_red: 'red',
+	 *	diffuse_green: 'green',
+	 *	diffuse_blue: 'blue'
+	 * } );
+	 *
+	 * Custom properties outside of the defaults for position, uv, normal
+	 * and color attributes can be added using the setCustomPropertyMapping method.
+	 * For example, the following maps the element properties “custom_property_a”
+	 * and “custom_property_b” to an attribute “customAttribute” with an item size of 2.
+	 * Attribute item sizes are set from the number of element properties in the property array.
+	 *
+	 * loader.setCustomPropertyMapping( {
+	 *	customAttribute: ['custom_property_a', 'custom_property_b'],
+	 * } );
+	 *
+	 */
+
+	const _color = new Color();
+
+	class PLYLoader extends Loader {
+
+		constructor( manager ) {
+
+			super( manager );
+
+			this.propertyNameMapping = {};
+			this.customPropertyMapping = {};
+
+		}
+
+		load( url, onLoad, onProgress, onError ) {
+
+			const scope = this;
+
+			const loader = new FileLoader( this.manager );
+			loader.setPath( this.path );
+			loader.setResponseType( 'arraybuffer' );
+			loader.setRequestHeader( this.requestHeader );
+			loader.setWithCredentials( this.withCredentials );
+			loader.load( url, function ( text ) {
+
+				try {
+
+					onLoad( scope.parse( text ) );
+
+				} catch ( e ) {
+
+					if ( onError ) {
+
+						onError( e );
+
+					} else {
+
+						console.error( e );
+
+					}
+
+					scope.manager.itemError( url );
+
+				}
+
+			}, onProgress, onError );
+
+		}
+
+		setPropertyNameMapping( mapping ) {
+
+			this.propertyNameMapping = mapping;
+
+		}
+
+		setCustomPropertyNameMapping( mapping ) {
+
+			this.customPropertyMapping = mapping;
+
+		}
+
+		parse( data ) {
+
+			function parseHeader( data ) {
+
+				const patternHeader = /^ply([\s\S]*)end_header(\r\n|\r|\n)/;
+				let headerText = '';
+				let headerLength = 0;
+				const result = patternHeader.exec( data );
+
+				if ( result !== null ) {
+
+					headerText = result[ 1 ];
+					headerLength = new Blob( [ result[ 0 ] ] ).size;
+
+				}
+
+				const header = {
+					comments: [],
+					elements: [],
+					headerLength: headerLength,
+					objInfo: ''
+				};
+
+				const lines = headerText.split( /\r\n|\r|\n/ );
+				let currentElement;
+
+				function make_ply_element_property( propertValues, propertyNameMapping ) {
+
+					const property = { type: propertValues[ 0 ] };
+
+					if ( property.type === 'list' ) {
+
+						property.name = propertValues[ 3 ];
+						property.countType = propertValues[ 1 ];
+						property.itemType = propertValues[ 2 ];
+
+					} else {
+
+						property.name = propertValues[ 1 ];
+
+					}
+
+					if ( property.name in propertyNameMapping ) {
+
+						property.name = propertyNameMapping[ property.name ];
+
+					}
+
+					return property;
+
+				}
+
+				for ( let i = 0; i < lines.length; i ++ ) {
+
+					let line = lines[ i ];
+					line = line.trim();
+
+					if ( line === '' ) continue;
+
+					const lineValues = line.split( /\s+/ );
+					const lineType = lineValues.shift();
+					line = lineValues.join( ' ' );
+
+					switch ( lineType ) {
+
+						case 'format':
+
+							header.format = lineValues[ 0 ];
+							header.version = lineValues[ 1 ];
+
+							break;
+
+						case 'comment':
+
+							header.comments.push( line );
+
+							break;
+
+						case 'element':
+
+							if ( currentElement !== undefined ) {
+
+								header.elements.push( currentElement );
+
+							}
+
+							currentElement = {};
+							currentElement.name = lineValues[ 0 ];
+							currentElement.count = parseInt( lineValues[ 1 ] );
+							currentElement.properties = [];
+
+							break;
+
+						case 'property':
+
+							currentElement.properties.push( make_ply_element_property( lineValues, scope.propertyNameMapping ) );
+
+							break;
+
+						case 'obj_info':
+
+							header.objInfo = line;
+
+							break;
+
+
+						default:
+
+							console.log( 'unhandled', lineType, lineValues );
+
+					}
+
+				}
+
+				if ( currentElement !== undefined ) {
+
+					header.elements.push( currentElement );
+
+				}
+
+				return header;
+
+			}
+
+			function parseASCIINumber( n, type ) {
+
+				switch ( type ) {
+
+					case 'char': case 'uchar': case 'short': case 'ushort': case 'int': case 'uint':
+					case 'int8': case 'uint8': case 'int16': case 'uint16': case 'int32': case 'uint32':
+
+						return parseInt( n );
+
+					case 'float': case 'double': case 'float32': case 'float64':
+
+						return parseFloat( n );
+
+				}
+
+			}
+
+			function parseASCIIElement( properties, line ) {
+
+				const values = line.split( /\s+/ );
+
+				const element = {};
+
+				for ( let i = 0; i < properties.length; i ++ ) {
+
+					if ( properties[ i ].type === 'list' ) {
+
+						const list = [];
+						const n = parseASCIINumber( values.shift(), properties[ i ].countType );
+
+						for ( let j = 0; j < n; j ++ ) {
+
+							list.push( parseASCIINumber( values.shift(), properties[ i ].itemType ) );
+
+						}
+
+						element[ properties[ i ].name ] = list;
+
+					} else {
+
+						element[ properties[ i ].name ] = parseASCIINumber( values.shift(), properties[ i ].type );
+
+					}
+
+				}
+
+				return element;
+
+			}
+
+			function createBuffer() {
+
+				const buffer = {
+				  indices: [],
+				  vertices: [],
+				  normals: [],
+				  uvs: [],
+				  faceVertexUvs: [],
+				  colors: [],
+				};
+
+				for ( const customProperty of Object.keys( scope.customPropertyMapping ) ) {
+
+				  buffer[ customProperty ] = [];
+
+				}
+
+				return buffer;
+
+			}
+
+			function parseASCII( data, header ) {
+
+				// PLY ascii format specification, as per http://en.wikipedia.org/wiki/PLY_(file_format)
+
+				const buffer = createBuffer();
+
+				let result;
+
+				const patternBody = /end_header\s([\s\S]*)$/;
+				let body = '';
+				if ( ( result = patternBody.exec( data ) ) !== null ) {
+
+					body = result[ 1 ];
+
+				}
+
+				const lines = body.split( /\r\n|\r|\n/ );
+				let currentElement = 0;
+				let currentElementCount = 0;
+
+				for ( let i = 0; i < lines.length; i ++ ) {
+
+					let line = lines[ i ];
+					line = line.trim();
+					if ( line === '' ) {
+
+						continue;
+
+					}
+
+					if ( currentElementCount >= header.elements[ currentElement ].count ) {
+
+						currentElement ++;
+						currentElementCount = 0;
+
+					}
+
+					const element = parseASCIIElement( header.elements[ currentElement ].properties, line );
+
+					handleElement( buffer, header.elements[ currentElement ].name, element );
+
+					currentElementCount ++;
+
+				}
+
+				return postProcess( buffer );
+
+			}
+
+			function postProcess( buffer ) {
+
+				let geometry = new BufferGeometry();
+
+				// mandatory buffer data
+
+				if ( buffer.indices.length > 0 ) {
+
+					geometry.setIndex( buffer.indices );
+
+				}
+
+				geometry.setAttribute( 'position', new Float32BufferAttribute( buffer.vertices, 3 ) );
+
+				// optional buffer data
+
+				if ( buffer.normals.length > 0 ) {
+
+					geometry.setAttribute( 'normal', new Float32BufferAttribute( buffer.normals, 3 ) );
+
+				}
+
+				if ( buffer.uvs.length > 0 ) {
+
+					geometry.setAttribute( 'uv', new Float32BufferAttribute( buffer.uvs, 2 ) );
+
+				}
+
+				if ( buffer.colors.length > 0 ) {
+
+					geometry.setAttribute( 'color', new Float32BufferAttribute( buffer.colors, 3 ) );
+
+				}
+
+				if ( buffer.faceVertexUvs.length > 0 ) {
+
+					geometry = geometry.toNonIndexed();
+					geometry.setAttribute( 'uv', new Float32BufferAttribute( buffer.faceVertexUvs, 2 ) );
+
+				}
+
+				// custom buffer data
+
+				for ( const customProperty of Object.keys( scope.customPropertyMapping ) ) {
+
+					if ( buffer[ customProperty ].length > 0 ) {
+
+					  	geometry.setAttribute(
+							customProperty,
+							new Float32BufferAttribute(
+						  		buffer[ customProperty ],
+						  		scope.customPropertyMapping[ customProperty ].length
+							)
+					  	);
+
+					}
+
+				}
+
+				geometry.computeBoundingSphere();
+
+				return geometry;
+
+			}
+
+			function handleElement( buffer, elementName, element ) {
+
+				function findAttrName( names ) {
+
+					for ( let i = 0, l = names.length; i < l; i ++ ) {
+
+						const name = names[ i ];
+
+						if ( name in element ) return name;
+
+					}
+
+					return null;
+
+				}
+
+				const attrX = findAttrName( [ 'x', 'px', 'posx' ] ) || 'x';
+				const attrY = findAttrName( [ 'y', 'py', 'posy' ] ) || 'y';
+				const attrZ = findAttrName( [ 'z', 'pz', 'posz' ] ) || 'z';
+				const attrNX = findAttrName( [ 'nx', 'normalx' ] );
+				const attrNY = findAttrName( [ 'ny', 'normaly' ] );
+				const attrNZ = findAttrName( [ 'nz', 'normalz' ] );
+				const attrS = findAttrName( [ 's', 'u', 'texture_u', 'tx' ] );
+				const attrT = findAttrName( [ 't', 'v', 'texture_v', 'ty' ] );
+				const attrR = findAttrName( [ 'red', 'diffuse_red', 'r', 'diffuse_r' ] );
+				const attrG = findAttrName( [ 'green', 'diffuse_green', 'g', 'diffuse_g' ] );
+				const attrB = findAttrName( [ 'blue', 'diffuse_blue', 'b', 'diffuse_b' ] );
+
+				if ( elementName === 'vertex' ) {
+
+					buffer.vertices.push( element[ attrX ], element[ attrY ], element[ attrZ ] );
+
+					if ( attrNX !== null && attrNY !== null && attrNZ !== null ) {
+
+						buffer.normals.push( element[ attrNX ], element[ attrNY ], element[ attrNZ ] );
+
+					}
+
+					if ( attrS !== null && attrT !== null ) {
+
+						buffer.uvs.push( element[ attrS ], element[ attrT ] );
+
+					}
+
+					if ( attrR !== null && attrG !== null && attrB !== null ) {
+
+						_color.setRGB(
+							element[ attrR ] / 255.0,
+							element[ attrG ] / 255.0,
+							element[ attrB ] / 255.0
+						).convertSRGBToLinear();
+
+						buffer.colors.push( _color.r, _color.g, _color.b );
+
+					}
+
+					for ( const customProperty of Object.keys( scope.customPropertyMapping ) ) {
+
+						for ( const elementProperty of scope.customPropertyMapping[ customProperty ] ) {
+
+						  buffer[ customProperty ].push( element[ elementProperty ] );
+
+						}
+
+					}
+
+				} else if ( elementName === 'face' ) {
+
+					const vertex_indices = element.vertex_indices || element.vertex_index; // issue #9338
+					const texcoord = element.texcoord;
+
+					if ( vertex_indices.length === 3 ) {
+
+						buffer.indices.push( vertex_indices[ 0 ], vertex_indices[ 1 ], vertex_indices[ 2 ] );
+
+						if ( texcoord && texcoord.length === 6 ) {
+
+							buffer.faceVertexUvs.push( texcoord[ 0 ], texcoord[ 1 ] );
+							buffer.faceVertexUvs.push( texcoord[ 2 ], texcoord[ 3 ] );
+							buffer.faceVertexUvs.push( texcoord[ 4 ], texcoord[ 5 ] );
+
+						}
+
+					} else if ( vertex_indices.length === 4 ) {
+
+						buffer.indices.push( vertex_indices[ 0 ], vertex_indices[ 1 ], vertex_indices[ 3 ] );
+						buffer.indices.push( vertex_indices[ 1 ], vertex_indices[ 2 ], vertex_indices[ 3 ] );
+
+					}
+
+				}
+
+			}
+
+			function binaryRead( dataview, at, type, little_endian ) {
+
+				switch ( type ) {
+
+					// corespondences for non-specific length types here match rply:
+					case 'int8':		case 'char':	 return [ dataview.getInt8( at ), 1 ];
+					case 'uint8':		case 'uchar':	 return [ dataview.getUint8( at ), 1 ];
+					case 'int16':		case 'short':	 return [ dataview.getInt16( at, little_endian ), 2 ];
+					case 'uint16':	case 'ushort': return [ dataview.getUint16( at, little_endian ), 2 ];
+					case 'int32':		case 'int':		 return [ dataview.getInt32( at, little_endian ), 4 ];
+					case 'uint32':	case 'uint':	 return [ dataview.getUint32( at, little_endian ), 4 ];
+					case 'float32': case 'float':	 return [ dataview.getFloat32( at, little_endian ), 4 ];
+					case 'float64': case 'double': return [ dataview.getFloat64( at, little_endian ), 8 ];
+
+				}
+
+			}
+
+			function binaryReadElement( dataview, at, properties, little_endian ) {
+
+				const element = {};
+				let result, read = 0;
+
+				for ( let i = 0; i < properties.length; i ++ ) {
+
+					if ( properties[ i ].type === 'list' ) {
+
+						const list = [];
+
+						result = binaryRead( dataview, at + read, properties[ i ].countType, little_endian );
+						const n = result[ 0 ];
+						read += result[ 1 ];
+
+						for ( let j = 0; j < n; j ++ ) {
+
+							result = binaryRead( dataview, at + read, properties[ i ].itemType, little_endian );
+							list.push( result[ 0 ] );
+							read += result[ 1 ];
+
+						}
+
+						element[ properties[ i ].name ] = list;
+
+					} else {
+
+						result = binaryRead( dataview, at + read, properties[ i ].type, little_endian );
+						element[ properties[ i ].name ] = result[ 0 ];
+						read += result[ 1 ];
+
+					}
+
+				}
+
+				return [ element, read ];
+
+			}
+
+			function parseBinary( data, header ) {
+
+				const buffer = createBuffer();
+
+				const little_endian = ( header.format === 'binary_little_endian' );
+				const body = new DataView( data, header.headerLength );
+				let result, loc = 0;
+
+				for ( let currentElement = 0; currentElement < header.elements.length; currentElement ++ ) {
+
+					for ( let currentElementCount = 0; currentElementCount < header.elements[ currentElement ].count; currentElementCount ++ ) {
+
+						result = binaryReadElement( body, loc, header.elements[ currentElement ].properties, little_endian );
+						loc += result[ 1 ];
+						const element = result[ 0 ];
+
+						handleElement( buffer, header.elements[ currentElement ].name, element );
+
+					}
+
+				}
+
+				return postProcess( buffer );
+
+			}
+
+			//
+
+			let geometry;
+			const scope = this;
+
+			if ( data instanceof ArrayBuffer ) {
+
+				const text = LoaderUtils.decodeText( new Uint8Array( data ) );
+				const header = parseHeader( text );
+
+				geometry = header.format === 'ascii' ? parseASCII( text, header ) : parseBinary( data, header );
+
+			} else {
+
+				geometry = parseASCII( data, parseHeader( data ) );
+
+			}
+
+			return geometry;
+
+		}
+
+	}
+
+	/**
+	 * Description: A THREE loader for STL ASCII files, as created by Solidworks and other CAD programs.
+	 *
+	 * Supports both binary and ASCII encoded files, with automatic detection of type.
+	 *
+	 * The loader returns a non-indexed buffer geometry.
+	 *
+	 * Limitations:
+	 *  Binary decoding supports "Magics" color format (http://en.wikipedia.org/wiki/STL_(file_format)#Color_in_binary_STL).
+	 *  There is perhaps some question as to how valid it is to always assume little-endian-ness.
+	 *  ASCII decoding assumes file is UTF-8.
+	 *
+	 * Usage:
+	 *  const loader = new STLLoader();
+	 *  loader.load( './models/stl/slotted_disk.stl', function ( geometry ) {
+	 *    scene.add( new THREE.Mesh( geometry ) );
+	 *  });
+	 *
+	 * For binary STLs geometry might contain colors for vertices. To use it:
+	 *  // use the same code to load STL as above
+	 *  if (geometry.hasColors) {
+	 *    material = new THREE.MeshPhongMaterial({ opacity: geometry.alpha, vertexColors: true });
+	 *  } else { .... }
+	 *  const mesh = new THREE.Mesh( geometry, material );
+	 *
+	 * For ASCII STLs containing multiple solids, each solid is assigned to a different group.
+	 * Groups can be used to assign a different color by defining an array of materials with the same length of
+	 * geometry.groups and passing it to the Mesh constructor:
+	 *
+	 * const mesh = new THREE.Mesh( geometry, material );
+	 *
+	 * For example:
+	 *
+	 *  const materials = [];
+	 *  const nGeometryGroups = geometry.groups.length;
+	 *
+	 *  const colorMap = ...; // Some logic to index colors.
+	 *
+	 *  for (let i = 0; i < nGeometryGroups; i++) {
+	 *
+	 *		const material = new THREE.MeshPhongMaterial({
+	 *			color: colorMap[i],
+	 *			wireframe: false
+	 *		});
+	 *
+	 *  }
+	 *
+	 *  materials.push(material);
+	 *  const mesh = new THREE.Mesh(geometry, materials);
+	 */
+
+
+	class STLLoader extends Loader {
+
+		constructor( manager ) {
+
+			super( manager );
+
+		}
+
+		load( url, onLoad, onProgress, onError ) {
+
+			const scope = this;
+
+			const loader = new FileLoader( this.manager );
+			loader.setPath( this.path );
+			loader.setResponseType( 'arraybuffer' );
+			loader.setRequestHeader( this.requestHeader );
+			loader.setWithCredentials( this.withCredentials );
+
+			loader.load( url, function ( text ) {
+
+				try {
+
+					onLoad( scope.parse( text ) );
+
+				} catch ( e ) {
+
+					if ( onError ) {
+
+						onError( e );
+
+					} else {
+
+						console.error( e );
+
+					}
+
+					scope.manager.itemError( url );
+
+				}
+
+			}, onProgress, onError );
+
+		}
+
+		parse( data ) {
+
+			function isBinary( data ) {
+
+				const reader = new DataView( data );
+				const face_size = ( 32 / 8 * 3 ) + ( ( 32 / 8 * 3 ) * 3 ) + ( 16 / 8 );
+				const n_faces = reader.getUint32( 80, true );
+				const expect = 80 + ( 32 / 8 ) + ( n_faces * face_size );
+
+				if ( expect === reader.byteLength ) {
+
+					return true;
+
+				}
+
+				// An ASCII STL data must begin with 'solid ' as the first six bytes.
+				// However, ASCII STLs lacking the SPACE after the 'd' are known to be
+				// plentiful.  So, check the first 5 bytes for 'solid'.
+
+				// Several encodings, such as UTF-8, precede the text with up to 5 bytes:
+				// https://en.wikipedia.org/wiki/Byte_order_mark#Byte_order_marks_by_encoding
+				// Search for "solid" to start anywhere after those prefixes.
+
+				// US-ASCII ordinal values for 's', 'o', 'l', 'i', 'd'
+
+				const solid = [ 115, 111, 108, 105, 100 ];
+
+				for ( let off = 0; off < 5; off ++ ) {
+
+					// If "solid" text is matched to the current offset, declare it to be an ASCII STL.
+
+					if ( matchDataViewAt( solid, reader, off ) ) return false;
+
+				}
+
+				// Couldn't find "solid" text at the beginning; it is binary STL.
+
+				return true;
+
+			}
+
+			function matchDataViewAt( query, reader, offset ) {
+
+				// Check if each byte in query matches the corresponding byte from the current offset
+
+				for ( let i = 0, il = query.length; i < il; i ++ ) {
+
+					if ( query[ i ] !== reader.getUint8( offset + i ) ) return false;
+
+				}
+
+				return true;
+
+			}
+
+			function parseBinary( data ) {
+
+				const reader = new DataView( data );
+				const faces = reader.getUint32( 80, true );
+
+				let r, g, b, hasColors = false, colors;
+				let defaultR, defaultG, defaultB, alpha;
+
+				// process STL header
+				// check for default color in header ("COLOR=rgba" sequence).
+
+				for ( let index = 0; index < 80 - 10; index ++ ) {
+
+					if ( ( reader.getUint32( index, false ) == 0x434F4C4F /*COLO*/ ) &&
+						( reader.getUint8( index + 4 ) == 0x52 /*'R'*/ ) &&
+						( reader.getUint8( index + 5 ) == 0x3D /*'='*/ ) ) {
+
+						hasColors = true;
+						colors = new Float32Array( faces * 3 * 3 );
+
+						defaultR = reader.getUint8( index + 6 ) / 255;
+						defaultG = reader.getUint8( index + 7 ) / 255;
+						defaultB = reader.getUint8( index + 8 ) / 255;
+						alpha = reader.getUint8( index + 9 ) / 255;
+
+					}
+
+				}
+
+				const dataOffset = 84;
+				const faceLength = 12 * 4 + 2;
+
+				const geometry = new BufferGeometry();
+
+				const vertices = new Float32Array( faces * 3 * 3 );
+				const normals = new Float32Array( faces * 3 * 3 );
+
+				for ( let face = 0; face < faces; face ++ ) {
+
+					const start = dataOffset + face * faceLength;
+					const normalX = reader.getFloat32( start, true );
+					const normalY = reader.getFloat32( start + 4, true );
+					const normalZ = reader.getFloat32( start + 8, true );
+
+					if ( hasColors ) {
+
+						const packedColor = reader.getUint16( start + 48, true );
+
+						if ( ( packedColor & 0x8000 ) === 0 ) {
+
+							// facet has its own unique color
+
+							r = ( packedColor & 0x1F ) / 31;
+							g = ( ( packedColor >> 5 ) & 0x1F ) / 31;
+							b = ( ( packedColor >> 10 ) & 0x1F ) / 31;
+
+						} else {
+
+							r = defaultR;
+							g = defaultG;
+							b = defaultB;
+
+						}
+
+					}
+
+					for ( let i = 1; i <= 3; i ++ ) {
+
+						const vertexstart = start + i * 12;
+						const componentIdx = ( face * 3 * 3 ) + ( ( i - 1 ) * 3 );
+
+						vertices[ componentIdx ] = reader.getFloat32( vertexstart, true );
+						vertices[ componentIdx + 1 ] = reader.getFloat32( vertexstart + 4, true );
+						vertices[ componentIdx + 2 ] = reader.getFloat32( vertexstart + 8, true );
+
+						normals[ componentIdx ] = normalX;
+						normals[ componentIdx + 1 ] = normalY;
+						normals[ componentIdx + 2 ] = normalZ;
+
+						if ( hasColors ) {
+
+							colors[ componentIdx ] = r;
+							colors[ componentIdx + 1 ] = g;
+							colors[ componentIdx + 2 ] = b;
+
+						}
+
+					}
+
+				}
+
+				geometry.setAttribute( 'position', new BufferAttribute( vertices, 3 ) );
+				geometry.setAttribute( 'normal', new BufferAttribute( normals, 3 ) );
+
+				if ( hasColors ) {
+
+					geometry.setAttribute( 'color', new BufferAttribute( colors, 3 ) );
+					geometry.hasColors = true;
+					geometry.alpha = alpha;
+
+				}
+
+				return geometry;
+
+			}
+
+			function parseASCII( data ) {
+
+				const geometry = new BufferGeometry();
+				const patternSolid = /solid([\s\S]*?)endsolid/g;
+				const patternFace = /facet([\s\S]*?)endfacet/g;
+				let faceCounter = 0;
+
+				const patternFloat = /[\s]+([+-]?(?:\d*)(?:\.\d*)?(?:[eE][+-]?\d+)?)/.source;
+				const patternVertex = new RegExp( 'vertex' + patternFloat + patternFloat + patternFloat, 'g' );
+				const patternNormal = new RegExp( 'normal' + patternFloat + patternFloat + patternFloat, 'g' );
+
+				const vertices = [];
+				const normals = [];
+
+				const normal = new Vector3();
+
+				let result;
+
+				let groupCount = 0;
+				let startVertex = 0;
+				let endVertex = 0;
+
+				while ( ( result = patternSolid.exec( data ) ) !== null ) {
+
+					startVertex = endVertex;
+
+					const solid = result[ 0 ];
+
+					while ( ( result = patternFace.exec( solid ) ) !== null ) {
+
+						let vertexCountPerFace = 0;
+						let normalCountPerFace = 0;
+
+						const text = result[ 0 ];
+
+						while ( ( result = patternNormal.exec( text ) ) !== null ) {
+
+							normal.x = parseFloat( result[ 1 ] );
+							normal.y = parseFloat( result[ 2 ] );
+							normal.z = parseFloat( result[ 3 ] );
+							normalCountPerFace ++;
+
+						}
+
+						while ( ( result = patternVertex.exec( text ) ) !== null ) {
+
+							vertices.push( parseFloat( result[ 1 ] ), parseFloat( result[ 2 ] ), parseFloat( result[ 3 ] ) );
+							normals.push( normal.x, normal.y, normal.z );
+							vertexCountPerFace ++;
+							endVertex ++;
+
+						}
+
+						// every face have to own ONE valid normal
+
+						if ( normalCountPerFace !== 1 ) {
+
+							console.error( 'THREE.STLLoader: Something isn\'t right with the normal of face number ' + faceCounter );
+
+						}
+
+						// each face have to own THREE valid vertices
+
+						if ( vertexCountPerFace !== 3 ) {
+
+							console.error( 'THREE.STLLoader: Something isn\'t right with the vertices of face number ' + faceCounter );
+
+						}
+
+						faceCounter ++;
+
+					}
+
+					const start = startVertex;
+					const count = endVertex - startVertex;
+
+					geometry.addGroup( start, count, groupCount );
+					groupCount ++;
+
+				}
+
+				geometry.setAttribute( 'position', new Float32BufferAttribute( vertices, 3 ) );
+				geometry.setAttribute( 'normal', new Float32BufferAttribute( normals, 3 ) );
+
+				return geometry;
+
+			}
+
+			function ensureString( buffer ) {
+
+				if ( typeof buffer !== 'string' ) {
+
+					return LoaderUtils.decodeText( new Uint8Array( buffer ) );
+
+				}
+
+				return buffer;
+
+			}
+
+			function ensureBinary( buffer ) {
+
+				if ( typeof buffer === 'string' ) {
+
+					const array_buffer = new Uint8Array( buffer.length );
+					for ( let i = 0; i < buffer.length; i ++ ) {
+
+						array_buffer[ i ] = buffer.charCodeAt( i ) & 0xff; // implicitly assumes little-endian
+
+					}
+
+					return array_buffer.buffer || array_buffer;
+
+				} else {
+
+					return buffer;
+
+				}
+
+			}
+
+			// start
+
+			const binData = ensureBinary( data );
+
+			return isBinary( binData ) ? parseBinary( binData ) : parseASCII( ensureString( data ) );
+
+		}
+
+	}
 
 	const emitEvent = (element, eventName, data) => {
 	  element.dispatchEvent(new window.CustomEvent(eventName, {
 	    detail: data
 	  }));
 	};
-
-	/*
-	 * Enable three.js cache.
-	 */
 	const enableCache = () => {
 	  Cache.enable = true;
 	};
-
-	/*
-	 * Disable three.js cache.
-	 */
 	const disableCache = () => {
 	  Cache.enable = false;
 	};
-
-	/*
-	 * Default configuration for camera.
-	 */
 	const setCamera = aspect => {
 	  const camera = new PerspectiveCamera(45, aspect, 0.01, 1000);
 	  camera.position.z = 5;
 	  camera.updateProjectionMatrix();
 	  return camera;
 	};
-
-	/*
-	 * Add lights to given scene (ambient and spots).
-	 */
 	const setLights = scene => {
 	  const ambient = new AmbientLight(0xffffff, 0.15);
 	  const backLight = new DirectionalLight(0xffffff, 0.3);
@@ -42757,10 +43733,6 @@
 	  };
 	  return scene;
 	};
-
-	/*
-	 * Link an orbit control to given camera and renderer.
-	 */
 	const setControls = (camera, renderer, isTrackball) => {
 	  let controls;
 	  if (isTrackball) {
@@ -42772,10 +43744,6 @@
 	  camera.controls = controls;
 	  return controls;
 	};
-
-	/*
-	 * Configure Three renderer.
-	 */
 	const setRenderer = (width, height) => {
 	  const renderer = new WebGLRenderer({
 	    antialias: true
@@ -42785,10 +43753,6 @@
 	  renderer.setClearColor(new Color('hsl(0, 0%, 10%)'));
 	  return renderer;
 	};
-
-	/*
-	 * Render function required by Three.js to display things.
-	 */
 	const render = (element, renderer, scene, camera, isTrackball) => {
 	  element.appendChild(renderer.domElement);
 	  const animate = () => {
@@ -42800,11 +43764,6 @@
 	  animate();
 	  return scene;
 	};
-
-	/*
-	 * Build the scene in which the object will be displayed. It configures Three
-	 * properly and adds camera, lights and controls.
-	 */
 	const prepareScene = (domElement, opts) => {
 	  const scene = new Scene();
 	  const element = domElement;
@@ -42823,11 +43782,6 @@
 	  scene.element = domElement;
 	  return scene;
 	};
-
-	/*
-	 * Load a mesh (.obj) into the given scene. Materials can be specified too
-	 * (.mtl).
-	 */
 	const loadObject = (scene, url, materialUrl, callback) => {
 	  const objLoader = new OBJLoader();
 	  if (scene.locked) return false;
@@ -42844,10 +43798,6 @@
 	  }
 	  return objLoader;
 	};
-
-	/*
-	 * Load mesh and materials (.glb) into the given scene.
-	 */
 	const loadGlb = (scene, url, callback) => {
 	  const loader = new GLTFLoader();
 	  if (scene.locked) return false;
@@ -42880,30 +43830,6 @@
 	  });
 	  return loader;
 	};
-
-	/*
-	const loadUsdz = (scene, url, callback) => {
-	  const loader = new USDZLoader()
-	  if (scene.locked) return false
-	  scene.locked = true
-
-	  const group = new THREE.Group()
-	  scene.add(group)
-	  loader.loadFile(file, group)
-	    .then(model => {
-	      fitCameraToObject(scene.camera, model, scene.lights)
-	      scene.locked = false
-	      if (callback) callback(model)
-	      emitEvent(scene.element, 'loaded', {model})
-	      return Promise.resolve(model)
-	    })
-	}
-	*/
-
-	/*
-	 * Load an .obj file. If no materials is configured on the loader, it sets
-	 * a phong grey material by default.
-	 */
 	const loadObj = (objLoader, scene, url, callback) => {
 	  const material = new MeshPhongMaterial({
 	    color: 0xbbbbcc
@@ -42942,10 +43868,44 @@
 	    if (callback) callback(err);
 	  });
 	};
-
-	/*
-	 * Remove all meshes from the scene.
-	 */
+	const loadPly = (scene, url, callback) => {
+	  const plyLoader = new PLYLoader();
+	  if (scene.locked) return false;
+	  scene.locked = true;
+	  plyLoader.load(url, geometry => {
+	    const material = new MeshPhongMaterial({
+	      color: 0xbbbbcc
+	    });
+	    const mesh = new Mesh(geometry, material);
+	    scene.add(mesh);
+	    fitCameraToObject(scene.camera, mesh, scene.lights);
+	    scene.locked = false;
+	    if (callback) callback(mesh);
+	    emitEvent(scene.element, 'loaded', {
+	      mesh
+	    });
+	  });
+	  return plyLoader;
+	};
+	const loadStl = (scene, url, callback) => {
+	  const stlLoader = new STLLoader();
+	  if (scene.locked) return false;
+	  scene.locked = true;
+	  stlLoader.load(url, geometry => {
+	    const material = new MeshPhongMaterial({
+	      color: 0xbbbbcc
+	    });
+	    const mesh = new Mesh(geometry, material);
+	    scene.add(mesh);
+	    fitCameraToObject(scene.camera, mesh, scene.lights);
+	    scene.locked = false;
+	    if (callback) callback(mesh);
+	    emitEvent(scene.element, 'loaded', {
+	      mesh
+	    });
+	  });
+	  return stlLoader;
+	};
 	const clearScene = scene => {
 	  scene.children.forEach(obj => {
 	    if (obj.type === 'Group') {
@@ -42953,17 +43913,9 @@
 	    }
 	  });
 	};
-
-	/*
-	 * Put back camera in its original position.
-	 */
 	const resetCamera = scene => {
 	  scene.camera.controls.reset();
 	};
-
-	/*
-	 * Put back camera in its original position.
-	 */
 	const showGrid = scene => {
 	  if (!scene.grid) {
 	    const size = 10;
@@ -42978,10 +43930,6 @@
 	const hideGrid = scene => {
 	  scene.grid.visible = false;
 	};
-
-	/*
-	 * Display the viewer through the fullscreen feature of the browser.
-	 */
 	const goFullScreen = element => {
 	  const hasWebkitFullScreen = ('webkitCancelFullScreen' in document);
 	  const hasMozFullScreen = ('mozCancelFullScreen' in document);
@@ -42997,11 +43945,6 @@
 	    return false;
 	  }
 	};
-
-	/*
-	 * When the window is resized, the camera aspect ratio needs to be updated to
-	 * avoid distortions.
-	 */
 	const onWindowResize = (element, camera, renderer) => () => {
 	  const resize = () => {
 	    const isFullscreen = !window.screenTop && !window.screenY;
@@ -43015,12 +43958,6 @@
 	  resize();
 	  setTimeout(resize, 100);
 	};
-
-	/*
-	 * Depending on the object size, the camera Z position must be bigger or
-	 * smaller to make sure the object fill all the space without getting outside
-	 * camera point of view.
-	 */
 	const fitCameraToObject = (camera, object, lights) => {
 	  const fov = camera.fov;
 	  const boundingBox = new Box3();
@@ -43036,10 +43973,6 @@
 	  lights.fillLight.position.set(z, 0, z);
 	  lights.backLight.position.set(z, 0, -z);
 	};
-
-	/*
-	 * Move object to the center.
-	 */
 	const resetObjectPosition = (boundingBox, object) => {
 	  const size = new Vector3();
 	  boundingBox.setFromObject(object);
@@ -43057,6 +43990,8 @@
 	exports.hideGrid = hideGrid;
 	exports.loadGlb = loadGlb;
 	exports.loadObject = loadObject;
+	exports.loadPly = loadPly;
+	exports.loadStl = loadStl;
 	exports.prepareScene = prepareScene;
 	exports.resetCamera = resetCamera;
 	exports.showGrid = showGrid;
